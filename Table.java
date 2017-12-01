@@ -8,6 +8,7 @@ public class Table implements Comparable<Table> {
 	private int currentTime;
 	private Order order;
 	private Cook cook;
+	private Diner diner;
 	private SynchronousQueue<Integer> servedTime;
 	
 	public Table(int number) {

@@ -6,7 +6,7 @@ public final class Order {
 	private int burgers;
 	private int fries;
 	private int coke;
-	private Map<Integer, Integer> times; // record the time each machine is used
+	private Map<Integer, Integer> times; 
 	public Order(int numBurgers, int numFries, int numCoke) {
 		burgers = numBurgers;
 		fries = numFries;

@@ -20,7 +20,9 @@ public class Restaurant {
 	private AtomicInteger numberOfPreparingOrders;
 	
 	private List<Machine> machines;
-	
+
+	public Map<Integer,String> message;
+
 	public Restaurant(int numTables, int numCooks, List<Integer> arrival) {
 		arrivedDiners = new PriorityQueue<Diner>();
 		numberOfRemainDiners = new AtomicInteger(arrival.size());
@@ -36,18 +38,23 @@ public class Restaurant {
 		numberOfPreparingOrders = new AtomicInteger(1);
 		
 		machines = new ArrayList<Machine>();
+
+		message = new HashMap<Integer,String>(); 
 	}
-	// extra init setting
+	// Initialize machine
 	public void addMachine(Machine machine) {
 		synchronized (machines) {
 			machines.add(machine);
 		}
 	}
+
+	// Diner enter into restaurant
 	public void enter(Diner diner) {
 		synchronized (arrivedDiners) {
 			arrivedDiners.offer(diner);
+			
+			writeMessage(diner.getArrivalTime(), "Diner " + String.valueOf(diner.getID()) + " arrives.\n");
 			arrivedDiners.notifyAll();
-			System.out.printf("%d - Diner %d arrives.\n", diner.getArrivalTime(), diner.getID());
 			try {
 				while (arrivedDiners.size() < numberOfRemainDiners.get()-numberOfPreparingOrders.get()+1 ||
 						diner != arrivedDiners.peek())
@@ -56,12 +63,23 @@ public class Restaurant {
 				Table table = tables.poll();
 				diner.setTable(table);
 				unassignedTables.put(table);
-				System.out.printf("%d - Diner %d is seated at Table %d.\n", diner.getSeatedTime(), diner.getID(), table.getNumber());
-				System.out.printf("%d - Cook %d processed Diner %d's order.\n", diner.getSeatedTime(), table.getCook().getNumber(), diner.getID());
 
+				writeMessage(diner.getSeatedTime(), "Diner " + String.valueOf(diner.getID()) + 
+							" is seated at Table " + String.valueOf(table.getNumber()) + "\n");
+				writeMessage(diner.getSeatedTime(), "Cook " + String.valueOf(table.getCook().getNumber()) + 
+							 " processes Diner " + String.valueOf(diner.getID()) + "\'s order.\n");
+				// writeMessage(diner.getArrivalTime(), "Diner " + String.valueOf(diner.getID()) + " is seated.");
 			} catch (InterruptedException e) {}
 		}
 	}
+
+	// Diner start eating.
+	public void startEating(Diner diner) {
+		String dinerID = String.valueOf(diner.getID());
+		writeMessage(diner.getServedTime(), "Diner " + dinerID + "\'s order is ready, Diner " + dinerID + " start eating.\n");
+	}
+
+	// Diner leaves the restaurant.
 	public void leave(Diner diner) {
 		Table table = diner.getTable();
 		diner.setTable(null);
@@ -70,21 +88,23 @@ public class Restaurant {
 		synchronized (tables) {
 			tables.add(table);
 		}
+		String dinerID = String.valueOf(diner.getID());
+		writeMessage(table.getCurrentTime(), "Diner " + dinerID + " finishes. Diner " + 
+					 dinerID + " leaves the restaurant.\n");
+					 
 		synchronized (arrivedDiners) {
 			if (numberOfRemainDiners.decrementAndGet() == 0) {
-				System.out.println(diner.getFinishedTime());
+				writeMessage(table.getCurrentTime(), "The last diner leaves the restaurant.\n");
+				printInfo();
 				System.exit(0);
 			}
 			arrivedDiners.notifyAll();
-		}
-		System.out.printf("%d - Diner %d finishes. Diner %d leaves the restaurant.\n", table.getCurrentTime(), diner.getID(), diner.getID());
-
+		}		
 	}
+
+	// Assign cook.
 	public void assignCook(Cook cook) {
 		try {
-			/*
-			 * always choose the cook with the smallest timestamp
-			 */
 			synchronized (availableCooks) {
 				availableCooks.add(cook);
 				availableCooks.notifyAll();
@@ -96,7 +116,9 @@ public class Restaurant {
 			cook.setTable(unassignedTables.take());
 		} catch (InterruptedException e) {}
 	}
-	public void preparingDish(Cook cook) {
+
+	// Cook prepair Order
+	public void preparingOrder(Cook cook) {
 		Machine machine = null;
 		do {
 			synchronized (cookingCooks) {
@@ -108,7 +130,6 @@ public class Restaurant {
 					} catch (InterruptedException e) {}
 				cookingCooks.poll();
 			}
-			// only 1 cook thread can reach here at a time
 			// find the machine with earliest available time to prepare the remaining order
 			machine = null;
 			for (int i = 0; i < NUMBER_OF_FOOD_TYPES; ++i) {
@@ -121,12 +142,11 @@ public class Restaurant {
 						machine = machines.get(i);
 				}
 			}
-			if (machine != null) {
-				int currentTime = cook.getCurrentTime();
-				System.out.printf("%d - Cook %d uses the %d machine.\n", currentTime, cook.getNumber(), machine.getType());
+			if (machine != null) {				
 				cook.prepare(machine);
-				
-
+				int currentTime = cook.getCurrentTime() - machine.getUnitDuration();
+				writeMessage(currentTime, "Cook " + String.valueOf(cook.getNumber()) + 
+							" uses the " + machine.getStringType() + " machine.\n");
 				if (isNextOrderAvailable(cook)) {
 					numberOfPreparingOrders.incrementAndGet();
 					synchronized (arrivedDiners) {
@@ -135,7 +155,7 @@ public class Restaurant {
 					synchronized (availableCooks) {
 						availableCooks.notifyAll();
 					}
-				}
+				}			
 			}
 		} while (machine != null);
 		if (numberOfPreparingOrders.get() > 1)
@@ -143,13 +163,13 @@ public class Restaurant {
 		synchronized (cookingCooks) {
 			cookingCooks.notifyAll();
 		}
-
 	}
+
 	private boolean isNextOrderAvailable(Cook cook) {
 		Diner diner = arrivedDiners.peek();
 		Cook nextCook = availableCooks.peek();
 		Table table = tables.peek();
-		
+
 		if (diner == null || nextCook == null || table == null) return false;
 		
 		if (nextCook.getCurrentTime() < cook.getCurrentTime() &&
@@ -159,7 +179,31 @@ public class Restaurant {
 		}
 		return false;
 	}
-	
+
+	private String timeString(int number) {
+		int hour = number / 60, minute = number % 60;
+		String hourFmt = String.format("%02d", hour);
+		String minuteFmt = String.format("%02d", minute);
+		return hourFmt + ":" + minuteFmt;
+	}
+
+	// Output
+	public void printInfo() {
+		Writer writer = null;
+		SortedSet<Integer> keys = new TreeSet<Integer>(message.keySet());
+		try {
+		    writer = new BufferedWriter(new OutputStreamWriter(
+		          new FileOutputStream("output.txt"), "utf-8"));
+		    for (int key : keys) { 
+			   writer.write(message.get(key));
+			}	    
+		} catch (IOException ex) {
+		  	System.exit(-1);
+		} finally {
+		   try {writer.close();} catch (Exception ex) {/*ignore*/}
+		}
+	}
+	// Read input
 	public static int readNonWhitespaceChar(BufferedReader reader) {
 		int r = -1;
 		try {
@@ -190,6 +234,14 @@ public class Restaurant {
 		}
 		return result;
 	}
+	public void writeMessage(int time, String log) {
+		synchronized(message) {
+			String existing = message.get(time);
+			String pre = timeString(time) + " - ";
+			String newMessage = existing == null ? pre + log : existing + pre + log;
+			message.put(time, newMessage);
+		}
+	}
 	/**
 	 * @param args
 	 */
@@ -201,8 +253,8 @@ public class Restaurant {
 		} catch (FileNotFoundException e) {
 			System.exit(-1);
 		}
-		NUMBER_OF_FOOD_TYPES = 3;
-		
+
+		NUMBER_OF_FOOD_TYPES = 3;		
 		int numDiners = readInt(reader);
 		int numTables = readInt(reader);
 		int numCooks = readInt(reader);
@@ -226,6 +278,6 @@ public class Restaurant {
 		for (int i = 0; i < numDiners; ++i) {
 			Order order = new Order(burgers.get(i), fries.get(i), coke.get(i));
 			(new Thread(new Diner(i, arrival.get(i), order, restaurant))).start();
-		}
+		}	
 	}
 }

@@ -12,6 +12,14 @@ public class Machine implements Comparable<Machine>{
 	public int getType() {
 		return type;
 	}
+	public String getStringType() {
+		switch (type) {
+			case 0 : return "burger";
+			case 1 : return "fries";
+			case 2 : return "coke";
+			default : return "Invalid machine";
+		}
+	}
 	public synchronized int getCurrentTime() {
 		return currentTime;
 	}
