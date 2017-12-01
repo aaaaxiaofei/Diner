@@ -47,6 +47,7 @@ public class Restaurant {
 		synchronized (arrivedDiners) {
 			arrivedDiners.offer(diner);
 			arrivedDiners.notifyAll();
+			System.out.printf("%d - Diner %d arrives.\n", diner.getArrivalTime(), diner.getID());
 			try {
 				while (arrivedDiners.size() < numberOfRemainDiners.get()-numberOfPreparingOrders.get()+1 ||
 						diner != arrivedDiners.peek())
@@ -55,6 +56,9 @@ public class Restaurant {
 				Table table = tables.poll();
 				diner.setTable(table);
 				unassignedTables.put(table);
+				System.out.printf("%d - Diner %d is seated at Table %d.\n", diner.getSeatedTime(), diner.getID(), table.getNumber());
+				System.out.printf("%d - Cook %d processed Diner %d's order.\n", diner.getSeatedTime(), table.getCook().getNumber(), diner.getID());
+
 			} catch (InterruptedException e) {}
 		}
 	}
@@ -73,6 +77,8 @@ public class Restaurant {
 			}
 			arrivedDiners.notifyAll();
 		}
+		System.out.printf("%d - Diner %d finishes. Diner %d leaves the restaurant.\n", table.getCurrentTime(), diner.getID(), diner.getID());
+
 	}
 	public void assignCook(Cook cook) {
 		try {
@@ -116,7 +122,11 @@ public class Restaurant {
 				}
 			}
 			if (machine != null) {
+				int currentTime = cook.getCurrentTime();
+				System.out.printf("%d - Cook %d uses the %d machine.\n", currentTime, cook.getNumber(), machine.getType());
 				cook.prepare(machine);
+				
+
 				if (isNextOrderAvailable(cook)) {
 					numberOfPreparingOrders.incrementAndGet();
 					synchronized (arrivedDiners) {
@@ -133,6 +143,7 @@ public class Restaurant {
 		synchronized (cookingCooks) {
 			cookingCooks.notifyAll();
 		}
+
 	}
 	private boolean isNextOrderAvailable(Cook cook) {
 		Diner diner = arrivedDiners.peek();
@@ -185,7 +196,8 @@ public class Restaurant {
 	public static void main(String[] args) {
 		BufferedReader reader = null;
 		try {
-			reader = new BufferedReader(new FileReader("input"));
+			File inputFile = new File(args[0]);
+			reader = new BufferedReader(new FileReader(inputFile));
 		} catch (FileNotFoundException e) {
 			System.exit(-1);
 		}
@@ -213,7 +225,7 @@ public class Restaurant {
 			(new Thread(new Cook(i, restaurant))).start();
 		for (int i = 0; i < numDiners; ++i) {
 			Order order = new Order(burgers.get(i), fries.get(i), coke.get(i));
-			(new Thread(new Diner(arrival.get(i), order, restaurant))).start();
+			(new Thread(new Diner(i, arrival.get(i), order, restaurant))).start();
 		}
 	}
 }

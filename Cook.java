@@ -8,7 +8,7 @@ public class Cook implements Runnable, Comparable<Cook> {
 	private Table table;
 	private Order order;
 	public Cook(int number, Restaurant restaurant) {
-		this.number = number;
+		this.number = number + 1;
 		this.restaurant = restaurant;
 		currentTime = 0;
 		table = null;

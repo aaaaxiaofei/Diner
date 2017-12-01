@@ -11,7 +11,7 @@ public class Table implements Comparable<Table> {
 	private SynchronousQueue<Integer> servedTime;
 	
 	public Table(int number) {
-		this.number = number;
+		this.number = number + 1;
 		servedTime = new SynchronousQueue<Integer>();
 		currentTime = 0;
 	}
