@@ -117,7 +117,7 @@ public class Restaurant {
 		} catch (InterruptedException e) {}
 	}
 
-	// Cook prepair Order
+	// Cook prepare Order
 	public void preparingOrder(Cook cook) {
 		Machine machine = null;
 		do {
